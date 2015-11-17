@@ -21,14 +21,14 @@ var Direction = {
 	DOWN : 3
 };
 
-/*var DirectionOffsets = {};
-DirectionOffsets[LEFT]  = {-1, 0};
-DirectionOffsets[RIGHT] = {1, 0};
-DirectionOffsets[UP]    = {0, -1};
-DirectoinOffsets[DOWN]  = {0, 1};*/
+var DirectionInfos = {};
+/*DirectionInfos[Direction.LEFT]  = {-1, 0};
+DirectionInfos[Direction.RIGHT] = {1, 0};
+DirectionInfos[Direction.UP]    = {0, -1};
+DirectoinInfos[Direction.DOWN]  = {0, 1};*/
 
 var preload = function () {
-	game.load.tilemap('map', './assets/map.json', null, Phaser.Tilemap.TILED_JSON);
+	game.load.tilemap('map', './assets/map.json?v=' + (new Date()).getTime(), null, Phaser.Tilemap.TILED_JSON);
 	game.load.image('Retro_Tileset_RGB', 'assets/Retro_Tileset_RGB.png', 32, 32);
  	game.load.spritesheet('red', 'assets/red.png', 32, 32);
 };
