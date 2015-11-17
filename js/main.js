@@ -3,106 +3,179 @@ var player,
 	blocks,
 	map,
 	sprite,
-	layer;
+	layer,
+	collisionMap,
+	movement,
+	collisionLayerIndex;
+	
+var animationComplete = true;
+var boundX = window.innerWidth;
+
+var gameWidth = 800;
+var gameHeight = 580;
+
+var Direction = {
+	LEFT : 0,
+	RIGHT : 1,
+	UP : 2,
+	DOWN : 3
+};
+
+/*var DirectionOffsets = {};
+DirectionOffsets[LEFT]  = {-1, 0};
+DirectionOffsets[RIGHT] = {1, 0};
+DirectionOffsets[UP]    = {0, -1};
+DirectoinOffsets[DOWN]  = {0, 1};*/
 
 var preload = function () {
-	game.load.tilemap('map', 'assets/map.json', null, Phaser.Tilemap.TILED_JSON);
-	game.load.image('Retro_Tileset_RBG', 'assets/Retro_Tileset_RBG.png', 16, 16);
+	game.load.tilemap('map', './assets/map.json', null, Phaser.Tilemap.TILED_JSON);
+	game.load.image('Retro_Tileset_RGB', 'assets/Retro_Tileset_RGB.png', 32, 32);
  	game.load.spritesheet('red', 'assets/red.png', 32, 32);
 };
+
+function onAnimationComplete(sprite, animation){
+	console.log("animation completed !");
+	window.animationComplete = true;
+}
 
 var create = function () {
 	game.physics.startSystem(Phaser.Physics.P2JS);
 	map = game.add.tilemap('map');
-	map.addTilesetImage('Retro_Tileset_RBG');
-	
+	map.addTilesetImage('Retro_Tileset_RGB');
 
-	collide = map.createLayer('collision');
-	collide.enableBody = true;
-	collide.debug = true;
-	//game.physics.arcade.enable(collide, Phaser.Physics.ARCADE, true);
+	collide = map.createLayer('collisions');
 	collide.resizeWorld();
-	console.log(collide);
-
 
 	layer = map.createLayer('calque');
 	layer.resizeWorld();
 
-	danger = map.createLayer('danger');
-	danger.resizeWorld();
+	//danger = map.createLayer('danger');
+	//danger.resizeWorld();
 	
-	map.setCollision(2, true, "collision");
-	map.setCollision(25, true, "collision");
-	map.setCollision(17, true, "collision");
-	map.setCollision(83, true, "collision");
-	map.setCollision(84, true, "collision");
-	map.setCollision(91, true, "collision");
-	map.setCollision(92, true, "collision");
-	map.setCollision(53, true, "collision");
-	map.setCollision(599, true, "collision");
-	map.setCollision(598, true, "collision");
-	map.setCollision(673, true), "collision";
-	map.setCollision(1610612738, true, "collision");
-	map.setCollision(19, true, "collision");
-	map.setCollisionBetween(180, 184,true, "collision");
-	map.setCollisionBetween(190, 192,true, "collision");
-	map.setCollisionBetween(197, 200,true, "collision");
-	map.setCollisionBetween(200, 209,true, "collision");
+	sprite = game.add.sprite(22*32 , 22*32, 'red');
+	
 
-	game.physics.p2.convertTilemap(map, "collision");
-	sprite = game.add.sprite(364, 272, 'red');
-
-	var down = sprite.animations.add('down', [0, 1], 8, true);
-	var left = sprite.animations.add('left', [2, 3], 8, true);
-	var right = sprite.animations.add('right', [4, 5], 8, true);
-	var up = sprite.animations.add('up', [6, 7], 8, true);
-
-	sprite.scale.setTo(sprite.scale.x / 2, sprite.scale.y / 2);
+	var down = sprite.animations.add('down', [0, 1], 8, false);
+	down.onComplete.add(onAnimationComplete, this);
+	
+	var left = sprite.animations.add('left', [2, 3], 8, false);
+	left.onComplete.add(onAnimationComplete, this);
+	
+	var right = sprite.animations.add('right', [4, 5], 8, false);
+	right.onComplete.add(onAnimationComplete, this);
+	
+	var up = sprite.animations.add('up', [6, 7], 8, false);
+	up.onComplete.add(onAnimationComplete, this);
 
 	game.camera.follow(sprite);
-
-	// map.setCollisionBetween(1, 1000, true, collide);
-	//game.physics.p2.enable(sprite);
-	//sprite.body.fixedRotation = true;
-	//sprite.body.clearShapes();  
+	game.world.setBounds(-gameWidth/2, -gameHeight/2, 3000, 3000);
 	
-	game.world.scale.setTo(game.world.scale.x + 1 , game.world.scale.y + 1);
+	collisionLayerIndex = map.getLayerIndex('collisions');
 };
 
-var update = function () {
-	//game.physics.arcade.collide(sprite, collide);
-	if (game.input.keyboard.isDown(Phaser.Keyboard.LEFT))
-    {
-        //sprite.body.moveLeft(30);
-        sprite.x += -1.1; 
-        sprite.animations.play('left', 8, false)
-    }
-    else if (game.input.keyboard.isDown(Phaser.Keyboard.RIGHT))
-    {
-    	sprite.x += 1.1;
-        // sprite.body.moveRight(30);
-        sprite.animations.play('right', 8, false)
-    }
+var moving;
 
-    else if (game.input.keyboard.isDown(Phaser.Keyboard.UP))
-    {
-    	sprite.y += -1.1;
-        // sprite.body.moveUp(30);
-        sprite.animations.play('up', 8, false)
-    }
-    else if (game.input.keyboard.isDown(Phaser.Keyboard.DOWN))
-    {
-    	sprite.y += 1.1;
-        // sprite.body.moveDown(30);
-        sprite.animations.play('down', 8, false)
-    }
+var inBound = function(x, y){
+	return (((x >= 0) && (x <= game.world.width)) 
+    && ((y >= 0) && (y <= game.world.height)));
+}
+
+/*var inBound = function(direction){
+	
+}*/
+
+var playerCollideWith = function(direction){
+	switch(direction){
+		case Direction.LEFT:
+			return map.getTileLeft(collisionLayerIndex, sprite.x/32, sprite.y/32).index != -1;
+		case Direction.RIGHT:
+			return map.getTileRight(collisionLayerIndex, sprite.x/32, sprite.y/32).index != -1;
+		case Direction.UP:
+			return map.getTileAbove(collisionLayerIndex, sprite.x/32, sprite.y/32).index != -1;
+		case Direction.DOWN:
+			return map.getTileBelow(collisionLayerIndex, sprite.x/32, sprite.y/32).index != -1;
+		default:
+		// Do something more meaningful instead of returning undefined ?
+			return;
+	}
+}
+
+var moveSpriteBy = function(x, y) {
+	var finalPositionX = sprite.x + x*32;
+	var finalPositionY = sprite.y + y*32;
+	if(inBound(finalPositionX, finalPositionY)){
+		game.add.tween(sprite).to({x: finalPositionX, y: finalPositionY}, 180, Phaser.Easing.Linear.None, true).onComplete.addOnce(
+		function(){
+			window.moving = false;
+		}, this);
+		window.moving = true;
+	}
+}
+var update = function () {
+	console.log(moving);
+	if(window.moving){
+		return;
+	}
+
+	if(!animationComplete){
+		console.log("please wait");
+	}
+	if(animationComplete){
+		console.log(moving);
+		if (game.input.keyboard.isDown(Phaser.Keyboard.LEFT)){
+
+			if(!playerCollideWith(Direction.LEFT)){
+				animationComplete = false;
+				moveSpriteBy(-1, 0);
+				sprite.animations.play('left', 8, false);
+			}
+			else{
+				sprite.animations.play('left', 4, false);
+				// Do something, like play the "bump" sound
+			}
+		}
+		else if (game.input.keyboard.isDown(Phaser.Keyboard.RIGHT)){
+			if(!playerCollideWith(Direction.RIGHT)){
+				animationComplete = false;
+				moveSpriteBy(1, 0);
+				sprite.animations.play('right', 8, false);
+			}
+			else{
+				sprite.animations.play('right', 4, false);
+				// Do something, like play the "bump" sound
+			}
+		}
+
+		else if (game.input.keyboard.isDown(Phaser.Keyboard.UP)){
+			if(!playerCollideWith(Direction.UP)){
+				animationComplete = false;
+				moveSpriteBy(0, -1);
+				sprite.animations.play('up', 8, false);
+			}
+			else{
+				sprite.animations.play('up', 4, false);
+				// Do something, like play the "bump" sound
+			}
+		}
+		else if (game.input.keyboard.isDown(Phaser.Keyboard.DOWN)){
+			if(!playerCollideWith(Direction.DOWN)){
+				animationComplete = false;
+				moveSpriteBy(0, 1);
+				sprite.animations.play('down', 8, false);
+			}
+			else{
+				sprite.animations.play('down', 4, false);
+				// Do something, like play the "bump" sound
+			}
+		}
+	}
 };
 
 var render = function () {
 
-    game.debug.cameraInfo(game.camera, 32, 32);
+    //game.debug.cameraInfo(game.camera, 32, 32);
     game.debug.spriteCoords(sprite, 32, 500);
 
 }
 
-var game = new Phaser.Game(800, 580, Phaser.AUTO, '', {preload: preload, create: create, update: update, render: render});
+var game = new Phaser.Game(gameWidth, gameHeight, Phaser.AUTO, '', {preload: preload, create: create, update: update, render: render});
