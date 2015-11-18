@@ -11,16 +11,8 @@ var player,
 	townEnabled,
 	itemArray = [],
 	it,
-	allItem;
-
-
-var Item = function () {
-	itemArray.push(game.add.sprite(33*16, 25*16 + 16, 'item'));
-	itemArray[itemArray.length - 1].attr = {
-		name: 'pokeball'
-	}
-	console.log(itemArray);
-}
+	allItem,
+	ball;
 
 var preload = function () {
 	game.load.tilemap('map', 'assets/map.json', null, Phaser.Tilemap.TILED_JSON);
@@ -36,9 +28,12 @@ var create = function () {
 	musicTown.loop = true;
 	musicTown.play();
 	townEnabled = true;
+
 	musicBattle = game.add.audio('battle');
 	musicBattle.loop = true;
+
 	game.physics.startSystem(Phaser.Physics.ARCADE);
+
 	map = game.add.tilemap('map');
 	map.addTilesetImage('Retro_Tileset_RBG');
 
@@ -51,20 +46,25 @@ var create = function () {
 	danger = map.createLayer('danger');
 	danger.resizeWorld();
 
-	allItem = game.add.group();
-	allItem.enableBody = true;
+	// allItem = game.add.group();
+	// allItem.enableBody = true;
 
-	it = allItem.create(33*16, 25*16 + 16, 'item');
+	// it = allItem.create(33*16, 25*16 + 16, 'item');
+	ball = game.add.sprite(33*16, 25*16 + 32, 'item');
 
 	sprite = game.add.sprite(33*16, 25*16, 'red');
 
-	it.custom = {
-		name: "pokeball"
-	};
-	it.height = 12;
-	it.width = 12;
+	// it.custom = {
+	// 	name: "pokeball"
+	// };
+	// it.height = 12;
+	// it.width = 12;
 
-	game.physics.arcade.enable(sprite);
+	game.physics.enable([sprite, ball], Phaser.Physics.ARCADE);
+	ball.body.velocity.x = 0;
+	ball.name = "pokeball";
+	//game.physics.enable(sprite);
+	//game.physics.arcade.enable(ball);
 
 	var down = sprite.animations.add('down', [0, 1], 8, true);
 	var left = sprite.animations.add('left', [2, 3], 8, true);
@@ -86,13 +86,14 @@ var moveSpriteBy = function(x, y) {
 		window.moving = false;
 	}, this);
 	window.moving = true;
-}
+};
 
 var update = function () {
-	// game.physics.arcade.collide(sprite, allItem, function () {
-	// 	console.log('collision');
-	// }, null, this);
-	game.physics.arcade.collide(sprite, allItem);
+	game.physics.arcade.collide(ball, sprite, function (obj1, obj2) {
+	 	console.log('obj1: ', obj1);
+		console.log('obj2: ', obj2);
+	}, null, this);
+	//game.physics.arcade.collide(sprite, ball);
 
 	if(window.moving)
 	{
@@ -131,7 +132,7 @@ var update = function () {
 			}, this);*/
 		//sprite.x -= 16;
 		//movement.start();
-		console.log(window.moving);
+		//console.log(window.moving);
 		//Phaser.Math.snapTo(sprite.world, 2);
         sprite.animations.play('left', 8, false)
     }
