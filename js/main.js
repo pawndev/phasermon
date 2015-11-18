@@ -6,13 +6,14 @@ var player,
 	layer,
 	collisionMap,
 	movement,
-	collisionLayerIndex;
+	collisionLayerIndex,
+	lastMoveDirection;
 	
 var animationComplete = true;
 var boundX = window.innerWidth;
 
-var gameWidth = 800;
-var gameHeight = 580;
+var gameWidth = 500;
+var gameHeight = 280;
 
 function Pair(x, y){
 	this.x = x;
@@ -29,13 +30,54 @@ var Direction = {
 // NOTE : I don't use bit shifting for division/multiplication because the javascript optimizers on modern
 // web browsers are clever enough to figure out that we got power of two, and perform optimization.
 
+var currentAnimationIndex = 1;
 
 // Information about directions.
 var DirectionInfos = {};
-DirectionInfos[Phaser.Keyboard.LEFT]  = {offset:new Pair(-1, 0), name:'left',  animationFrames:[2, 3]};
-DirectionInfos[Phaser.Keyboard.RIGHT] = {offset:new Pair(1, 0),  name:'right', animationFrames:[4, 5]};
-DirectionInfos[Phaser.Keyboard.UP]    = {offset:new Pair(0, -1), name:'up',    animationFrames:[6, 7]};
-DirectionInfos[Phaser.Keyboard.DOWN]  = {offset:new Pair(0, 1),  name:'down',  animationFrames:[0, 1]};
+DirectionInfos[Phaser.Keyboard.LEFT]  = {
+	offset:new Pair(-1, 0),
+	animations: {
+		1:{
+			name:'left1',  animationFrames:[4, 5]
+		},
+		2:{
+			name:'left2', animationFrames:[6, 7]
+		}
+	}
+};
+DirectionInfos[Phaser.Keyboard.RIGHT] = {
+	offset:new Pair(1, 0),
+	animations: {
+		1:{
+			name:'right1', animationFrames:[8, 9]
+		},
+		2:{
+			name:'right2', animationFrames:[10, 11]
+		}
+	}
+};
+DirectionInfos[Phaser.Keyboard.UP] = {
+	offset:new Pair(0, -1), 
+	animations: {
+		1:{
+			name:'up1', animationFrames:[12, 13]
+		},
+		2:{
+			name:'up2', animationFrames:[14, 15]
+		}
+	}
+};
+DirectionInfos[Phaser.Keyboard.DOWN] = {
+	offset:new Pair(0, 1),
+	animations: {
+		1:{
+			name:'down1',  animationFrames:[0, 1]
+		},
+		2:{
+			name:'down2', animationFrames:[2, 3]
+		}
+	}
+};
 
 var moving;
 
@@ -48,10 +90,8 @@ var inBound = function(x, y){
 
 // Move sprite by x in abciss, and y in ordinates. The coordinate (x, y) must be tile coordinate.
 var moveSpriteBy = function(x, y) {
-	var finalPositionX = sprite.x + x*32;
-	var finalPositionY = sprite.y + y*32;
-	if(inBound(finalPositionX, finalPositionY)){
-		game.add.tween(sprite).to({x: finalPositionX, y: finalPositionY}, 125, Phaser.Easing.Linear.None, true).onComplete.addOnce(
+	if(inBound(sprite.x + x*32, sprite.y + y*32)){
+		game.add.tween(sprite).to({x: sprite.x + x*32, y: sprite.y + y*32}, 180, Phaser.Easing.Linear.None, true).onComplete.addOnce(
 		function(){
 			window.moving = false;
 		}, this);
@@ -68,6 +108,8 @@ var moveSpriteIn = function(direction) {
 var playerCollideWith = function(direction){
 	var targetX = sprite.x/32 + DirectionInfos[direction].offset.x;
 	var targetY = sprite.y/32 + DirectionInfos[direction].offset.y;
+	// The first condition is only to be sure that we are not passing negative values to the getTile function.
+	// However, going out of bound should never happen, should we leave it here ?
 	return (!inBound(targetX, targetY)
 			|| map.getTile(targetX, targetY, collisionLayerIndex, true).index != -1);
 }
@@ -83,15 +125,24 @@ var isDirectionalKey = function(keyCode){
 // Main function for movement processing.
 var directionalKeyPressProcess = function(direction){
 	if(isDirectionalKey(direction) && animationComplete){
+			//console.log(currentAnimationIndex);
 		if(!playerCollideWith(direction)){
+			/*if(lastMoveDirection == direction){
+				console.log("hello")
+				animationComplete = false;
+				moveSpriteIn(direction);
+			}*/
 			animationComplete = false;
 			moveSpriteIn(direction);
-			sprite.animations.play(DirectionInfos[direction].name, 8, false);
+			sprite.animations.play(DirectionInfos[direction].animations[currentAnimationIndex].name, 8, false);
 		}
 		else{
 			// TODO : Play "bump" sound here.
-			sprite.animations.play(DirectionInfos[direction].name, 4, false);
+			//animationComplete = false;
+			sprite.animations.play(DirectionInfos[direction].animations[currentAnimationIndex].name, 4, false);
 		}
+		lastMoveDirection = direction;
+		currentAnimationIndex = (currentAnimationIndex == 1 ? 2 : 1);
 	}
 }
 
@@ -105,7 +156,7 @@ var preload = function () {
 	// Make the tilemap always reload instead of sitting in cache. Useful for testing and map making.
 	game.load.tilemap('map', './assets/map.json?v=' + (new Date()).getTime(), null, Phaser.Tilemap.TILED_JSON);
 	game.load.image('Retro_Tileset_RGB', 'assets/Retro_Tileset_RGB.png', 32, 32);
- 	game.load.spritesheet('red', 'assets/red.png', 32, 32);
+ 	game.load.spritesheet('red', 'assets/red.png?v=1', 32, 32);
 };
 
 // On game creation.
@@ -124,25 +175,32 @@ var create = function () {
 
 	for(var direction in window.DirectionInfos){
 		var info = DirectionInfos[direction];
-		var dir = sprite.animations.add(info.name, info.animationFrames, 8, false);
-		dir.onComplete.add(onAnimationComplete, this);
+		console.log("ok");
+		console.log(info.animations);
+		for(var anim in info.animations){
+			console.log(info.animations[anim].animationFrames)
+			var dir = sprite.animations.add(info.animations[anim].name, info.animations[anim].animationFrames, 8, true);
+			dir.onComplete.add(onAnimationComplete, this);
+		}
 	}
 
 	game.camera.follow(sprite);
+	// TODO : Arbitrary values, need to change later !
 	game.world.setBounds(-gameWidth/2, -gameHeight/2, 3000, 3000);
 	
 	collisionLayerIndex = map.getLayerIndex('collisions');
 	console.log(collisionLayerIndex);
+	sprite.frame = 1;
 };
 
+var inf;
 var update = function () {
 	if(window.moving){
 		return;
 	}
-
-	if(!animationComplete){
-	}
-	if(game.input.keyboard.lastKey != null && game.input.keyboard.isDown(game.input.keyboard.lastKey.keyCode)){
+	//console.log(game.input.keyboard.lastKey);
+	if(game.input.keyboard.lastKey != null 
+	   && game.input.keyboard.isDown(game.input.keyboard.lastKey.keyCode)){
 		directionalKeyPressProcess(game.input.keyboard.lastKey.keyCode);
 	}
 };
