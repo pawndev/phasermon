@@ -7,10 +7,20 @@ var player,
 	collisionMap,
 	movement,
 	collisionLayerIndex,
-	lastMoveDirection;
+	lastMoveDirection,
+	lastCompletedMoveDirection;
 	
 var animationComplete = true;
-var boundX = window.innerWidth;
+
+// Bumping is badly named, as it serve to indicate if we are changing direction but not walking,
+// and if we're actually bumping.
+var bumping = false;
+
+// Time we take to move by one tile.
+var moveTime = 180;
+
+var animationLength = 8;
+var animationLengthBump = 4;
 
 var gameWidth = 500;
 var gameHeight = 280;
@@ -80,6 +90,7 @@ DirectionInfos[Phaser.Keyboard.DOWN] = {
 };
 
 var moving;
+var last;
 
 // Simple function to check if the (x, y) coordinate is in world bound.
 // The coordinate must be in world space.
@@ -91,7 +102,7 @@ var inBound = function(x, y){
 // Move sprite by x in abciss, and y in ordinates. The coordinate (x, y) must be tile coordinate.
 var moveSpriteBy = function(x, y) {
 	if(inBound(sprite.x + x*32, sprite.y + y*32)){
-		game.add.tween(sprite).to({x: sprite.x + x*32, y: sprite.y + y*32}, 180, Phaser.Easing.Linear.None, true).onComplete.addOnce(
+		game.add.tween(sprite).to({x: sprite.x + x*32, y: sprite.y + y*32}, moveTime, Phaser.Easing.Linear.None, true).onComplete.addOnce(
 		function(){
 			window.moving = false;
 		}, this);
@@ -127,28 +138,36 @@ var directionalKeyPressProcess = function(direction){
 	if(isDirectionalKey(direction) && animationComplete){
 			//console.log(currentAnimationIndex);
 		if(!playerCollideWith(direction)){
-			/*if(lastMoveDirection == direction){
-				console.log("hello")
+			if(lastCompletedMoveDirection == direction || game.input.keyboard.lastKey.duration >= 150){
 				animationComplete = false;
 				moveSpriteIn(direction);
-			}*/
-			animationComplete = false;
-			moveSpriteIn(direction);
-			sprite.animations.play(DirectionInfos[direction].animations[currentAnimationIndex].name, 8, false);
+				sprite.animations.play(DirectionInfos[direction].animations[currentAnimationIndex].name, animationLength, false);
+			}
+			else if(!bumping){
+				bumping = true;
+				sprite.animations.play(DirectionInfos[direction].animations[currentAnimationIndex].name, animationLength, false);
+			}
+			//animationComplete = false;
+			//moveSpriteIn(direction);
+			currentAnimationIndex = (currentAnimationIndex == 1 ? 2 : 1);
 		}
-		else{
+		else if(!bumping){
 			// TODO : Play "bump" sound here.
-			animationComplete = false;
-			sprite.animations.play(DirectionInfos[direction].animations[currentAnimationIndex].name, 4, false);
+			bumping = true;
+			sprite.animations.play(DirectionInfos[direction].animations[currentAnimationIndex].name, animationLengthBump, false);
+			currentAnimationIndex = (currentAnimationIndex == 1 ? 2 : 1);
 		}
 		lastMoveDirection = direction;
-		currentAnimationIndex = (currentAnimationIndex == 1 ? 2 : 1);
 	}
 }
 
 // Callback function used to know when an animation ends.
+// Eventually can remove the lastMoveDirection variable, but will require a maybe more costly function.
+// Thus, event if it's bad design I decide to keep it this way.
 function onAnimationComplete(sprite, animation){
 	window.animationComplete = true;
+	bumping = false;
+	lastCompletedMoveDirection = lastMoveDirection;
 }
 
 // Preload everything before we start.
@@ -175,8 +194,6 @@ var create = function () {
 
 	for(var direction in window.DirectionInfos){
 		var info = DirectionInfos[direction];
-		console.log("ok");
-		console.log(info.animations);
 		for(var anim in info.animations){
 			console.log(info.animations[anim].animationFrames)
 			var dir = sprite.animations.add(info.animations[anim].name, info.animations[anim].animationFrames, 8, true);
