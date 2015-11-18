@@ -14,6 +14,11 @@ var boundX = window.innerWidth;
 var gameWidth = 800;
 var gameHeight = 580;
 
+function Pair(x, y){
+	this.x = x;
+	this.y = y;
+}
+
 var Direction = {
 	LEFT : 0,
 	RIGHT : 1,
@@ -21,25 +26,90 @@ var Direction = {
 	DOWN : 3
 };
 
-var DirectionInfos = {};
-/*DirectionInfos[Direction.LEFT]  = {-1, 0};
-DirectionInfos[Direction.RIGHT] = {1, 0};
-DirectionInfos[Direction.UP]    = {0, -1};
-DirectoinInfos[Direction.DOWN]  = {0, 1};*/
+// NOTE : I don't use bit shifting for division/multiplication because the javascript optimizers on modern
+// web browsers are clever enough to figure out that we got power of two, and perform optimization.
 
+
+// Information about directions.
+var DirectionInfos = {};
+DirectionInfos[Phaser.Keyboard.LEFT]  = {offset:new Pair(-1, 0), name:'left',  animationFrames:[2, 3]};
+DirectionInfos[Phaser.Keyboard.RIGHT] = {offset:new Pair(1, 0),  name:'right', animationFrames:[4, 5]};
+DirectionInfos[Phaser.Keyboard.UP]    = {offset:new Pair(0, -1), name:'up',    animationFrames:[6, 7]};
+DirectionInfos[Phaser.Keyboard.DOWN]  = {offset:new Pair(0, 1),  name:'down',  animationFrames:[0, 1]};
+
+var moving;
+
+// Simple function to check if the (x, y) coordinate is in world bound.
+// The coordinate must be in world space.
+var inBound = function(x, y){
+	return (((x >= 0) && (x <= game.world.width)) 
+		&& ((y >= 0) && (y <= game.world.height)));
+}
+
+// Move sprite by x in abciss, and y in ordinates. The coordinate (x, y) must be tile coordinate.
+var moveSpriteBy = function(x, y) {
+	var finalPositionX = sprite.x + x*32;
+	var finalPositionY = sprite.y + y*32;
+	if(inBound(finalPositionX, finalPositionY)){
+		game.add.tween(sprite).to({x: finalPositionX, y: finalPositionY}, 125, Phaser.Easing.Linear.None, true).onComplete.addOnce(
+		function(){
+			window.moving = false;
+		}, this);
+		window.moving = true;
+	}
+}
+
+// Move sprite in the diven direction (direction are expressed by phaser directional key keyCodes).
+var moveSpriteIn = function(direction) {
+	moveSpriteBy(DirectionInfos[direction].offset.x, DirectionInfos[direction].offset.y);
+}
+
+// Check if player collides with an adjacent tile in the grid.
+var playerCollideWith = function(direction){
+	var targetX = sprite.x/32 + DirectionInfos[direction].offset.x;
+	var targetY = sprite.y/32 + DirectionInfos[direction].offset.y;
+	return (!inBound(targetX, targetY)
+			|| map.getTile(targetX, targetY, collisionLayerIndex, true).index != -1);
+}
+
+// Check if the keyCode passed is a directional key's keyCode.
+var isDirectionalKey = function(keyCode){
+	return ((keyCode == Phaser.Keyboard.LEFT)
+		 || (keyCode == Phaser.Keyboard.RIGHT)
+		 || (keyCode == Phaser.Keyboard.UP)
+		 || (keyCode == Phaser.Keyboard.DOWN));
+}
+
+// Main function for movement processing.
+var directionalKeyPressProcess = function(direction){
+	if(isDirectionalKey(direction) && animationComplete){
+		if(!playerCollideWith(direction)){
+			animationComplete = false;
+			moveSpriteIn(direction);
+			sprite.animations.play(DirectionInfos[direction].name, 8, false);
+		}
+		else{
+			// TODO : Play "bump" sound here.
+			sprite.animations.play(DirectionInfos[direction].name, 4, false);
+		}
+	}
+}
+
+// Callback function used to know when an animation ends.
+function onAnimationComplete(sprite, animation){
+	window.animationComplete = true;
+}
+
+// Preload everything before we start.
 var preload = function () {
+	// Make the tilemap always reload instead of sitting in cache. Useful for testing and map making.
 	game.load.tilemap('map', './assets/map.json?v=' + (new Date()).getTime(), null, Phaser.Tilemap.TILED_JSON);
 	game.load.image('Retro_Tileset_RGB', 'assets/Retro_Tileset_RGB.png', 32, 32);
  	game.load.spritesheet('red', 'assets/red.png', 32, 32);
 };
 
-function onAnimationComplete(sprite, animation){
-	console.log("animation completed !");
-	window.animationComplete = true;
-}
-
+// On game creation.
 var create = function () {
-	game.physics.startSystem(Phaser.Physics.P2JS);
 	map = game.add.tilemap('map');
 	map.addTilesetImage('Retro_Tileset_RGB');
 
@@ -48,126 +118,32 @@ var create = function () {
 
 	layer = map.createLayer('calque');
 	layer.resizeWorld();
-
-	//danger = map.createLayer('danger');
-	//danger.resizeWorld();
 	
 	sprite = game.add.sprite(22*32 , 22*32, 'red');
 	
 
-	var down = sprite.animations.add('down', [0, 1], 8, false);
-	down.onComplete.add(onAnimationComplete, this);
-	
-	var left = sprite.animations.add('left', [2, 3], 8, false);
-	left.onComplete.add(onAnimationComplete, this);
-	
-	var right = sprite.animations.add('right', [4, 5], 8, false);
-	right.onComplete.add(onAnimationComplete, this);
-	
-	var up = sprite.animations.add('up', [6, 7], 8, false);
-	up.onComplete.add(onAnimationComplete, this);
+	for(var direction in window.DirectionInfos){
+		var info = DirectionInfos[direction];
+		var dir = sprite.animations.add(info.name, info.animationFrames, 8, false);
+		dir.onComplete.add(onAnimationComplete, this);
+	}
 
 	game.camera.follow(sprite);
 	game.world.setBounds(-gameWidth/2, -gameHeight/2, 3000, 3000);
 	
 	collisionLayerIndex = map.getLayerIndex('collisions');
+	console.log(collisionLayerIndex);
 };
 
-var moving;
-
-var inBound = function(x, y){
-	return (((x >= 0) && (x <= game.world.width)) 
-    && ((y >= 0) && (y <= game.world.height)));
-}
-
-/*var inBound = function(direction){
-	
-}*/
-
-var playerCollideWith = function(direction){
-	switch(direction){
-		case Direction.LEFT:
-			return map.getTileLeft(collisionLayerIndex, sprite.x/32, sprite.y/32).index != -1;
-		case Direction.RIGHT:
-			return map.getTileRight(collisionLayerIndex, sprite.x/32, sprite.y/32).index != -1;
-		case Direction.UP:
-			return map.getTileAbove(collisionLayerIndex, sprite.x/32, sprite.y/32).index != -1;
-		case Direction.DOWN:
-			return map.getTileBelow(collisionLayerIndex, sprite.x/32, sprite.y/32).index != -1;
-		default:
-		// Do something more meaningful instead of returning undefined ?
-			return;
-	}
-}
-
-var moveSpriteBy = function(x, y) {
-	var finalPositionX = sprite.x + x*32;
-	var finalPositionY = sprite.y + y*32;
-	if(inBound(finalPositionX, finalPositionY)){
-		game.add.tween(sprite).to({x: finalPositionX, y: finalPositionY}, 180, Phaser.Easing.Linear.None, true).onComplete.addOnce(
-		function(){
-			window.moving = false;
-		}, this);
-		window.moving = true;
-	}
-}
 var update = function () {
-	console.log(moving);
 	if(window.moving){
 		return;
 	}
 
 	if(!animationComplete){
-		console.log("please wait");
 	}
-	if(animationComplete){
-		console.log(moving);
-		if (game.input.keyboard.isDown(Phaser.Keyboard.LEFT)){
-
-			if(!playerCollideWith(Direction.LEFT)){
-				animationComplete = false;
-				moveSpriteBy(-1, 0);
-				sprite.animations.play('left', 8, false);
-			}
-			else{
-				sprite.animations.play('left', 4, false);
-				// Do something, like play the "bump" sound
-			}
-		}
-		else if (game.input.keyboard.isDown(Phaser.Keyboard.RIGHT)){
-			if(!playerCollideWith(Direction.RIGHT)){
-				animationComplete = false;
-				moveSpriteBy(1, 0);
-				sprite.animations.play('right', 8, false);
-			}
-			else{
-				sprite.animations.play('right', 4, false);
-				// Do something, like play the "bump" sound
-			}
-		}
-
-		else if (game.input.keyboard.isDown(Phaser.Keyboard.UP)){
-			if(!playerCollideWith(Direction.UP)){
-				animationComplete = false;
-				moveSpriteBy(0, -1);
-				sprite.animations.play('up', 8, false);
-			}
-			else{
-				sprite.animations.play('up', 4, false);
-				// Do something, like play the "bump" sound
-			}
-		}
-		else if (game.input.keyboard.isDown(Phaser.Keyboard.DOWN)){
-			if(!playerCollideWith(Direction.DOWN)){
-				animationComplete = false;
-				moveSpriteBy(0, 1);
-				sprite.animations.play('down', 8, false);
-			}
-			else{
-				sprite.animations.play('down', 4, false);
-				// Do something, like play the "bump" sound
-			}
-		}
+	if(game.input.keyboard.lastKey != null && game.input.keyboard.isDown(game.input.keyboard.lastKey.keyCode)){
+		directionalKeyPressProcess(game.input.keyboard.lastKey.keyCode);
 	}
 };
 
