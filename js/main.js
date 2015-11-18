@@ -138,7 +138,7 @@ var directionalKeyPressProcess = function(direction){
 		}
 		else{
 			// TODO : Play "bump" sound here.
-			//animationComplete = false;
+			animationComplete = false;
 			sprite.animations.play(DirectionInfos[direction].animations[currentAnimationIndex].name, 4, false);
 		}
 		lastMoveDirection = direction;
