@@ -9,7 +9,10 @@ var player,
 	collisionLayerIndex,
 	lastMoveDirection,
 	lastCompletedMoveDirection,
-	tileSetProperties;
+	tileSetProperties,
+	musicTown,
+	musicBattle,
+	townEnabled;
 
 var collisionData;
 	
@@ -147,7 +150,6 @@ var isDirectionalKey = function(keyCode){
 // Main function for movement processing.
 var directionalKeyPressProcess = function(direction){
 	if(isDirectionalKey(direction) && animationComplete){
-		console.log(currentAnimationIndex);
 		if(!playerCollideWith(direction)){
 			if(lastCompletedMoveDirection == direction || game.input.keyboard.lastKey.duration >= 125){
 				animationComplete = false;
@@ -192,15 +194,27 @@ var preload = function () {
  	game.load.spritesheet('red', 'assets/red.png?v=1', 32, 32);
 	data = JSON.parse(mapData);
 	data = data.tilesets[0].tileproperties;
+	game.load.audio('town', 'assets/town.mp3');
+ 	game.load.audio('battle', 'assets/battle.mp3');
 };
 
 // On game creation.
 var create = function () {
+
+	musicTown = game.add.audio('town');
+	musicTown.loop = true;
+	musicTown.play();
+	townEnabled = true;
+
+	musicBattle = game.add.audio('battle');
+	musicBattle.loop = true;
+
 	map = game.add.tilemap('map');
 	map.addTilesetImage('Retro_Tileset_RGB');
 	
 	map.tilesets[0].properties = data;
 	tileSetProperties = map.tilesets[0].properties;
+	console.log(map.tilesets);
 	
 	// The parseint is somewhat ugly here. Well ...
 	for(var key in data){
@@ -244,6 +258,22 @@ var update = function () {
 	if(game.input.keyboard.lastKey != null 
 	   && game.input.keyboard.isDown(game.input.keyboard.lastKey.keyCode)){
 		directionalKeyPressProcess(game.input.keyboard.lastKey.keyCode);
+	}
+	console.log(map.getTileBelow(0, sprite.x / 32, sprite.y / 32).properties);
+	if (map.getTile(sprite.x / 32, sprite.y / 32, 'calque', true).properties.danger === "true") {
+		console.log('boulou1');
+		if (townEnabled) {
+			console.log('boulou2');
+			musicTown.stop();
+			musicBattle.play();
+			townEnabled = false;
+		}
+	} else {
+		if (!townEnabled) {
+			townEnabled = true;
+			musicTown.play();
+			musicBattle.stop();
+		}
 	}
 };
 
