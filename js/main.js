@@ -8,7 +8,10 @@ var player,
 	movement,
 	collisionLayerIndex,
 	lastMoveDirection,
-	lastCompletedMoveDirection;
+	lastCompletedMoveDirection,
+	tileSetProperties;
+
+var collisionData;
 	
 var animationComplete = true;
 
@@ -92,6 +95,13 @@ DirectionInfos[Phaser.Keyboard.DOWN] = {
 var moving;
 var last;
 
+var getJSONP = function(url){
+	var HttpReq = new XMLHttpRequest();
+	HttpReq.open("GET", url, false);
+	HttpReq.send(null);
+	return HttpReq.responseText;
+}
+
 // Simple function to check if the (x, y) coordinate is in world bound.
 // The coordinate must be in world space.
 var inBound = function(x, y){
@@ -121,8 +131,9 @@ var playerCollideWith = function(direction){
 	var targetY = sprite.y/32 + DirectionInfos[direction].offset.y;
 	// The first condition is only to be sure that we are not passing negative values to the getTile function.
 	// However, going out of bound should never happen, should we leave it here ?
+
 	return (!inBound(targetX, targetY)
-			|| map.getTile(targetX, targetY, collisionLayerIndex, true).index != -1);
+			|| map.getTile(targetX, targetY, 0, true).properties.collides);
 }
 
 // Check if the keyCode passed is a directional key's keyCode.
@@ -136,9 +147,9 @@ var isDirectionalKey = function(keyCode){
 // Main function for movement processing.
 var directionalKeyPressProcess = function(direction){
 	if(isDirectionalKey(direction) && animationComplete){
-			//console.log(currentAnimationIndex);
+		console.log(currentAnimationIndex);
 		if(!playerCollideWith(direction)){
-			if(lastCompletedMoveDirection == direction || game.input.keyboard.lastKey.duration >= 150){
+			if(lastCompletedMoveDirection == direction || game.input.keyboard.lastKey.duration >= 125){
 				animationComplete = false;
 				moveSpriteIn(direction);
 				sprite.animations.play(DirectionInfos[direction].animations[currentAnimationIndex].name, animationLength, false);
@@ -171,20 +182,34 @@ function onAnimationComplete(sprite, animation){
 }
 
 // Preload everything before we start.
+// TODO : we should store mapData in memory, not just data
+var data;
 var preload = function () {
 	// Make the tilemap always reload instead of sitting in cache. Useful for testing and map making.
-	game.load.tilemap('map', './assets/map.json?v=' + (new Date()).getTime(), null, Phaser.Tilemap.TILED_JSON);
+	var mapData = getJSONP('./assets/map.json?v=' + (new Date()).getTime());
+	game.load.tilemap('map', '', mapData, Phaser.Tilemap.TILED_JSON);
 	game.load.image('Retro_Tileset_RGB', 'assets/Retro_Tileset_RGB.png', 32, 32);
  	game.load.spritesheet('red', 'assets/red.png?v=1', 32, 32);
+	data = JSON.parse(mapData);
+	data = data.tilesets[0].tileproperties;
 };
 
 // On game creation.
 var create = function () {
 	map = game.add.tilemap('map');
 	map.addTilesetImage('Retro_Tileset_RGB');
+	
+	map.tilesets[0].properties = data;
+	tileSetProperties = map.tilesets[0].properties;
+	
+	// The parseint is somewhat ugly here. Well ...
+	for(var key in data){
+		console.log((parseInt(key)+1).toString());
+		map.setCollision((parseInt(key)+1).toString(), true)
+	}
 
-	collide = map.createLayer('collisions');
-	collide.resizeWorld();
+	//collide = map.createLayer('collisions');
+	//collide.resizeWorld();
 
 	layer = map.createLayer('calque');
 	layer.resizeWorld();
